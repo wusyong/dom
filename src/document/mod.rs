@@ -12,8 +12,12 @@
 pub mod wrapper;
 
 use gc::Trace;
-use js::prelude::*;
-use kuchiki::NodeRef;
+use js::{
+    object::{ConstructorBuilder, ObjectData},
+    prelude::*,
+};
+use kuchiki::{traits::TendrilSink, NodeRef};
+use tap::{Conv, Pipe};
 
 use crate::builtin::BuiltIn;
 
@@ -32,16 +36,56 @@ impl BuiltIn for Document {
     const NAME: &'static str = "Document";
 
     fn init(context: &mut Context) -> Option<JsValue> {
-        todo!()
+        ConstructorBuilder::new(context, Self::constructor)
+            .name(Self::NAME)
+            .method(Self::say_hello, "say_hello", 0)
+            .build()
+            .conv::<JsValue>()
+            .pipe(Some)
     }
 }
 
 impl Document {
     fn constructor(
-        new_target: &JsValue,
-        args: &[JsValue],
+        _new_target: &JsValue,
+        _args: &[JsValue],
         context: &mut Context,
     ) -> JsResult<JsValue> {
-        todo!()
+        let document = Self::fake_new(context)?;
+        Ok(document.into())
+    }
+
+    fn fake_new(context: &mut Context) -> JsResult<JsObject> {
+        let html = r"
+            <DOCTYPE html>
+            <html>
+            <head></head>
+            <body>
+                <h1>Example</h1>
+                <p class='foo'>Hello, world!</p>
+                <p class='foo'>I love HTML</p>
+            </body>
+            </html>
+        ";
+        let node = kuchiki::parse_html().one(html);
+        let document = Document { node };
+
+        // TODO: Find better way to get prototype
+        let prototype = context
+            .global_object()
+            .clone()
+            .get("Document", context)?
+            .as_object()
+            .unwrap()
+            .get("prototype", context)?
+            .as_object()
+            .unwrap()
+            .clone();
+        Ok(JsObject::from_proto_and_data(prototype, ObjectData::native_object(Box::new(document))))
+    }
+
+    pub fn say_hello(_: &JsValue, _: &[JsValue], _: &mut Context) -> JsResult<JsValue> {
+        println!("Hello World from Document.");
+        Ok(JsValue::Null)
     }
 }
