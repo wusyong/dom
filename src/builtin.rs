@@ -1,6 +1,6 @@
 use js::{property::Attribute, Context, JsValue};
 
-use crate::Document;
+use crate::*;
 
 /// Trait representing a global built-in object such as `Math`, `Object` or
 /// `String`.
@@ -52,6 +52,7 @@ pub fn init(context: &mut Context) {
     }
 
     globals! {
-        Document
+        Document,
+        Window
     };
 }

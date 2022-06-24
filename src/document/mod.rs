@@ -22,9 +22,9 @@ use tap::{Conv, Pipe};
 use crate::builtin::BuiltIn;
 
 /// DOM `Document` built-in implementation.
-#[derive(Debug, Finalize)]
+#[derive(Debug, Clone, Finalize)]
 pub struct Document {
-    pub node: NodeRef,
+    node: NodeRef,
 }
 
 // Safety: NodeRef is already reference counted.
@@ -38,7 +38,6 @@ impl BuiltIn for Document {
     fn init(context: &mut Context) -> Option<JsValue> {
         ConstructorBuilder::new(context, Self::constructor)
             .name(Self::NAME)
-            .method(Self::say_hello, "say_hello", 0)
             .build()
             .conv::<JsValue>()
             .pipe(Some)
@@ -46,30 +45,27 @@ impl BuiltIn for Document {
 }
 
 impl Document {
+    /// Returns a new document.
+    ///
+    /// The `new Document()` constructor steps are to set this’s origin to the
+    /// origin of current global object’s associated Document.
+    ///
+    /// More information:
+    ///  - [DOM reference][spec]
+    ///  - [MDN documentation][mdn]
+    ///
+    /// [spec]: https://dom.spec.whatwg.org/#dom-document-document
+    /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/Document/Document
     fn constructor(
         _new_target: &JsValue,
         _args: &[JsValue],
-        context: &mut Context,
+        _context: &mut Context,
     ) -> JsResult<JsValue> {
-        let document = Self::fake_new(context)?;
-        Ok(document.into())
+        // We should get it from window's associated Document aka global object
+        todo!()
     }
 
-    fn fake_new(context: &mut Context) -> JsResult<JsObject> {
-        let html = r"
-            <DOCTYPE html>
-            <html>
-            <head></head>
-            <body>
-                <h1>Example</h1>
-                <p class='foo'>Hello, world!</p>
-                <p class='foo'>I love HTML</p>
-            </body>
-            </html>
-        ";
-        let node = kuchiki::parse_html().one(html);
-        let document = Document { node };
-
+    pub(crate) fn new(node: NodeRef, context: &mut Context) -> JsResult<JsObject> {
         // TODO: Find better way to get prototype
         let prototype = context
             .global_object()
@@ -81,11 +77,10 @@ impl Document {
             .as_object()
             .unwrap()
             .clone();
-        Ok(JsObject::from_proto_and_data(prototype, ObjectData::native_object(Box::new(document))))
-    }
-
-    pub fn say_hello(_: &JsValue, _: &[JsValue], _: &mut Context) -> JsResult<JsValue> {
-        println!("Hello World from Document.");
-        Ok(JsValue::Null)
+        let document = Document { node };
+        Ok(JsObject::from_proto_and_data(
+            prototype,
+            ObjectData::native_object(Box::new(document)),
+        ))
     }
 }
