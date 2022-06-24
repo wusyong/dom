@@ -1,27 +1,23 @@
-//! This module implements the global `Document` object.
-//!
-//! The `Document` interface represents any web page loaded in the browser and serves as an entry point into the web page's content, which is the DOM tree.
-//!
-//! More information:
-//!  - [DOM reference][spec]
-//!  - [MDN documentation][mdn]
-//!
-//! [spec]: https://dom.spec.whatwg.org/#interface-document
-//! [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/document
-
-pub mod wrapper;
-
 use gc::Trace;
 use js::{
     object::{ConstructorBuilder, ObjectData},
     prelude::*,
 };
-use kuchiki::{traits::TendrilSink, NodeRef};
+use kuchiki::NodeRef;
 use tap::{Conv, Pipe};
 
-use crate::builtin::BuiltIn;
+use crate::DOM;
 
-/// DOM `Document` built-in implementation.
+/// The `Document` DOM object implementation.
+///
+/// The `Document` interface represents any web page loaded in the browser and serves as an entry point into the web page's content, which is the DOM tree.
+///
+/// More information:
+///  - [DOM reference][spec]
+///  - [MDN documentation][mdn]
+///
+/// [spec]: https://dom.spec.whatwg.org/#interface-document
+/// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/document
 #[derive(Debug, Clone, Finalize)]
 pub struct Document {
     node: NodeRef,
@@ -32,19 +28,9 @@ unsafe impl Trace for Document {
     unsafe_empty_trace!();
 }
 
-impl BuiltIn for Document {
+impl DOM for Document {
     const NAME: &'static str = "Document";
 
-    fn init(context: &mut Context) -> Option<JsValue> {
-        ConstructorBuilder::new(context, Self::constructor)
-            .name(Self::NAME)
-            .build()
-            .conv::<JsValue>()
-            .pipe(Some)
-    }
-}
-
-impl Document {
     /// Returns a new document.
     ///
     /// The `new Document()` constructor steps are to set this’s origin to the
@@ -56,16 +42,21 @@ impl Document {
     ///
     /// [spec]: https://dom.spec.whatwg.org/#dom-document-document
     /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/Document/Document
-    fn constructor(
-        _new_target: &JsValue,
-        _args: &[JsValue],
-        _context: &mut Context,
-    ) -> JsResult<JsValue> {
+    fn constructor(_: &JsValue, _: &[JsValue], _: &mut Context) -> JsResult<JsValue> {
         // We should get it from window's associated Document aka global object
         todo!()
     }
 
-    pub(crate) fn new(node: NodeRef, context: &mut Context) -> JsResult<JsObject> {
+    fn init(context: &mut Context) -> Option<JsValue> {
+        ConstructorBuilder::new(context, Self::constructor)
+            .name(Self::NAME)
+            .method(Self::say_hello, "say_hello", 0)
+            .build()
+            .conv::<JsValue>()
+            .pipe(Some)
+    }
+
+    fn js_object(&self, context: &mut Context) -> JsResult<JsObject> {
         // TODO: Find better way to get prototype
         let prototype = context
             .global_object()
@@ -77,10 +68,25 @@ impl Document {
             .as_object()
             .unwrap()
             .clone();
-        let document = Document { node };
+
         Ok(JsObject::from_proto_and_data(
             prototype,
-            ObjectData::native_object(Box::new(document)),
+            ObjectData::native_object(Box::new(self.clone())),
         ))
+    }
+}
+
+impl Document {
+    pub fn new(node: NodeRef) -> Self {
+        Document { node }
+    }
+
+    pub fn as_node(&self) -> &NodeRef {
+        &self.node
+    }
+
+    pub fn say_hello(_: &JsValue, _: &[JsValue], _context: &mut Context) -> JsResult<JsValue> {
+        println!("Hello Document");
+        Ok(JsValue::Undefined)
     }
 }
