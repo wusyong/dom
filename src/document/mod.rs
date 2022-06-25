@@ -6,7 +6,7 @@ use js::{
 use kuchiki::NodeRef;
 use tap::{Conv, Pipe};
 
-use crate::DOM;
+use crate::{Node, DOM};
 
 /// The `Document` DOM object implementation.
 ///
@@ -20,7 +20,7 @@ use crate::DOM;
 /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/document
 #[derive(Debug, Clone, Finalize)]
 pub struct Document {
-    node: NodeRef,
+    node: Node,
 }
 
 // Safety: NodeRef is already reference counted.
@@ -48,9 +48,22 @@ impl DOM for Document {
     }
 
     fn init(context: &mut Context) -> Option<JsValue> {
+        // TODO: Find better way to get prototype
+        let prototype = context
+            .global_object()
+            .clone()
+            .get("Node", context)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .get("prototype", context)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone();
         ConstructorBuilder::new(context, Self::constructor)
             .name(Self::NAME)
-            .method(Self::say_hello, "say_hello", 0)
+            .inherit(prototype)
             .build()
             .conv::<JsValue>()
             .pipe(Some)
@@ -78,15 +91,11 @@ impl DOM for Document {
 
 impl Document {
     pub fn new(node: NodeRef) -> Self {
+        let node = Node::new(node);
         Document { node }
     }
 
-    pub fn as_node(&self) -> &NodeRef {
+    pub fn as_node(&self) -> &Node {
         &self.node
-    }
-
-    pub fn say_hello(_: &JsValue, _: &[JsValue], _context: &mut Context) -> JsResult<JsValue> {
-        println!("Hello Document");
-        Ok(JsValue::Undefined)
     }
 }

@@ -16,7 +16,7 @@ let context = &mut Context::default();
 let window = dom::init(context).unwrap();
 context.eval("window.document").unwrap();
 context.eval("window.say_hello();").unwrap();
-context.eval("window.document.say_hello();").unwrap();
+context.eval("window.document.getRootNode();").unwrap();
 let _document = window.document();
 ```
 

@@ -100,7 +100,7 @@ mod tests {
         let window = crate::init(context).unwrap();
         context.eval("window.document").unwrap();
         context.eval("window.say_hello();").unwrap();
-        context.eval("window.document.say_hello();").unwrap();
+        context.eval("window.document.getRootNode();").unwrap();
         let _document = window.document();
     }
 }

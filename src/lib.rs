@@ -12,5 +12,7 @@ pub use prelude::{init, DOM};
 ////////////////
 mod document;
 pub use document::Document;
+mod node;
+pub use node::Node;
 mod window;
 pub use window::Window;

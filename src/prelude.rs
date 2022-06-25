@@ -61,7 +61,9 @@ pub fn init(context: &mut Context) -> JsResult<Window> {
         }
     }
 
+    // Order is important. Some types require previous type's prototype.
     globals! {
+        Node,
         Document,
         Window
     };
