@@ -1,94 +1,70 @@
-use gc::Trace;
-use js::{
-    object::{ConstructorBuilder, ObjectData},
-    prelude::*,
-};
 use kuchiki::NodeRef;
-use tap::{Conv, Pipe};
+use v8::*;
 
-use crate::{Document, DOM};
+use crate::Document;
 
-#[derive(Debug, Clone, Finalize)]
+#[derive(Debug, Clone)]
 pub struct Node {
     inner: NodeRef,
 }
 
-// Safety: NodeRef is already reference counted.
-unsafe impl Trace for Node {
-    unsafe_empty_trace!();
-}
-
-impl DOM for Node {
+impl Node {
     const NAME: &'static str = "Node";
 
-    fn constructor(_: &JsValue, _: &[JsValue], context: &mut Context) -> JsResult<JsValue> {
-        // `Node` has no constructor.
-        context.throw_type_error("Illegal constructor.")
-    }
+    pub fn template<'s>(
+        &self,
+        scope: &mut HandleScope<'s, ()>,
+    ) -> Option<Local<'s, FunctionTemplate>> {
+        let template = FunctionTemplate::builder(
+            // TODO
+            |_: &mut HandleScope, _: FunctionCallbackArguments, _: ReturnValue| {},
+        )
+        .build(scope);
 
-    fn init(context: &mut Context) -> Option<JsValue> {
-        ConstructorBuilder::new(context, Self::constructor)
-            .name(Self::NAME)
-            .constructor(false)
-            .method(Self::get_root_node, "getRootNode", 0)
-            .build()
-            .conv::<JsValue>()
-            .pipe(Some)
-    }
+        template.set_class_name(String::new(scope, Self::NAME).unwrap());
 
-    fn js_object(&self, context: &mut Context) -> JsResult<JsObject> {
-        // TODO: Find better way to get prototype
-        let prototype = context
-            .global_object()
-            .clone()
-            .get("Node", context)?
-            .as_object()
-            .unwrap()
-            .get("prototype", context)?
-            .as_object()
-            .unwrap()
-            .clone();
+        let instance = template.prototype_template(scope);
+        let name = String::new(scope, "n").unwrap();
+        let num = Number::new(scope, 10.0);
+        instance.set(name.into(), num.into());
 
-        let node = JsObject::from_proto_and_data(
-            prototype,
-            ObjectData::native_object(Box::new(self.clone())),
-        );
-        Ok(node)
+        let instance = template.instance_template(scope);
+        let name = String::new(scope, "m").unwrap();
+        let num = Number::new(scope, 10.0);
+        instance.set(name.into(), num.into());
+
+        Some(template)
     }
 }
 
-/// Methods for JS Context.
-impl Node {
-    // FIXME: This is not the correct way to do this.
-    pub fn get_root_node(
-        this: &JsValue,
-        args: &[JsValue],
-        context: &mut Context,
-    ) -> JsResult<JsValue> {
-        match this
-            .as_object()
-            .unwrap()
-            .downcast_ref::<Document>()
-            .unwrap()
-            .as_node()
-            .as_raw()
-            .ancestors()
-            .last()
-        {
-            Some(node) => Ok(Node::new(node).js_object(context)?.into()),
-            None => Ok(JsValue::Null),
-        }
-    }
-}
+// /// Methods for JS Context.
+// impl Node {
+//     // FIXME: This is not the correct way to do this.
+//     pub fn get_root_node(
+//         this: &JsValue,
+//         args: &[JsValue],
+//         context: &mut Context,
+//     ) -> JsResult<JsValue> {
+//         match this
+//             .as_object()
+//             .unwrap()
+//             .downcast_ref::<Document>()
+//             .unwrap()
+//             .as_node()
+//             .as_raw()
+//             .ancestors()
+//             .last()
+//         {
+//             Some(node) => Ok(Node::new(node).js_object(context)?.into()),
+//             None => Ok(JsValue::Null),
+//         }
+//     }
+// }
 
 /// Methods for Rust.
 impl Node {
     pub fn new(inner: NodeRef) -> Self {
         Node { inner }
-    }
-
-    pub fn as_raw(&self) -> &NodeRef {
-        &self.inner
     }
 
     /// Get the parent node of this node.

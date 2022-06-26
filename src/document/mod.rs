@@ -1,12 +1,7 @@
-use gc::Trace;
-use js::{
-    object::{ConstructorBuilder, ObjectData},
-    prelude::*,
-};
 use kuchiki::NodeRef;
-use tap::{Conv, Pipe};
+use v8::*;
 
-use crate::{Node, DOM};
+use crate::Node;
 
 /// The `Document` DOM object implementation.
 ///
@@ -18,17 +13,12 @@ use crate::{Node, DOM};
 ///
 /// [spec]: https://dom.spec.whatwg.org/#interface-document
 /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/document
-#[derive(Debug, Clone, Finalize)]
+#[derive(Debug, Clone)]
 pub struct Document {
     node: Node,
 }
 
-// Safety: NodeRef is already reference counted.
-unsafe impl Trace for Document {
-    unsafe_empty_trace!();
-}
-
-impl DOM for Document {
+impl Document {
     const NAME: &'static str = "Document";
 
     /// Returns a new document.
@@ -42,56 +32,39 @@ impl DOM for Document {
     ///
     /// [spec]: https://dom.spec.whatwg.org/#dom-document-document
     /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/Document/Document
-    fn constructor(_: &JsValue, _: &[JsValue], _: &mut Context) -> JsResult<JsValue> {
-        // We should get it from window's associated Document aka global object
-        todo!()
-    }
+    pub fn template<'s>(
+        &self,
+        scope: &mut HandleScope<'s, ()>,
+        node: Local<'s, FunctionTemplate>,
+    ) -> Option<Local<'s, FunctionTemplate>> {
+        let template = FunctionTemplate::builder(
+            // TODO
+            |_: &mut HandleScope, _: FunctionCallbackArguments, _: ReturnValue| {
+                println!("Hello");
+            },
+        )
+        .build(scope);
 
-    fn init(context: &mut Context) -> Option<JsValue> {
-        // TODO: Find better way to get prototype
-        let prototype = context
-            .global_object()
-            .clone()
-            .get("Node", context)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("prototype", context)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .clone();
-        ConstructorBuilder::new(context, Self::constructor)
-            .name(Self::NAME)
-            .inherit(prototype)
-            .build()
-            .conv::<JsValue>()
-            .pipe(Some)
-    }
+        template.set_class_name(String::new(scope, Self::NAME).unwrap());
+        template.inherit(node);
 
-    fn js_object(&self, context: &mut Context) -> JsResult<JsObject> {
-        // TODO: Find better way to get prototype
-        let prototype = context
-            .global_object()
-            .clone()
-            .get("Document", context)?
-            .as_object()
-            .unwrap()
-            .get("prototype", context)?
-            .as_object()
-            .unwrap()
-            .clone();
+        let instance = template.prototype_template(scope);
+        let name = String::new(scope, "a").unwrap();
+        let num = Number::new(scope, 10.0);
+        instance.set(name.into(), num.into());
 
-        Ok(JsObject::from_proto_and_data(
-            prototype,
-            ObjectData::native_object(Box::new(self.clone())),
-        ))
+        let instance = template.instance_template(scope);
+        let name = String::new(scope, "b").unwrap();
+        let num = Number::new(scope, 10.0);
+        instance.set(name.into(), num.into());
+
+        Some(template)
     }
 }
 
 impl Document {
-    pub fn new(node: NodeRef) -> Self {
-        let node = Node::new(node);
+    pub fn new(root: NodeRef) -> Self {
+        let node = Node::new(root);
         Document { node }
     }
 

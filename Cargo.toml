@@ -6,8 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gc = "0.4"
-js = { package = "boa_engine", version = "0.15" }
-boa_interner = "0.15"
 kuchiki = "0.8"
-tap = "1.0"
+v8 = "0.44"

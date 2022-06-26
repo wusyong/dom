@@ -1,11 +1,7 @@
 #![doc = include_str!("../README.md")]
 
-#[macro_use]
-extern crate gc;
-
 pub mod prelude;
-pub use js;
-pub use prelude::{init, DOM};
+pub use prelude::init;
 
 ////////////////
 // DOM objects
