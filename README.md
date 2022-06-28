@@ -9,16 +9,6 @@ in order to be used in JavaScript [Context].
 
 An usage example would look like this:
 
-```rust
-use dom::js::Context;
-
-let context = &mut Context::default();
-let window = dom::init(context).unwrap();
-context.eval("window.document").unwrap();
-context.eval("window.say_hello();").unwrap();
-context.eval("window.document.getRootNode();").unwrap();
-let _document = window.document();
-```
 
 ## How to create DOM objects in JavaScript Context?
 
