@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use kuchiki::NodeRef;
 use v8::*;
 
@@ -32,14 +34,32 @@ impl Document {
     ///
     /// [spec]: https://dom.spec.whatwg.org/#dom-document-document
     /// [mdn]: https://developer.mozilla.org/en-US/docs/Web/API/Document/Document
-    pub fn template<'s>(
+    pub fn constructor<'s>(
         &self,
         scope: &mut HandleScope<'s, ()>,
         node: Local<'s, FunctionTemplate>,
     ) -> Option<Local<'s, FunctionTemplate>> {
         let template = FunctionTemplate::builder(
-            // TODO
-            |_: &mut HandleScope, _: FunctionCallbackArguments, _: ReturnValue| {
+            |scope: &mut HandleScope, args: FunctionCallbackArguments, _: ReturnValue| {
+                // TODO we will use this to set private data
+                let this = args.this();
+                let key = String::new(scope, "bb").unwrap();
+                let key = Private::new(scope, Some(key));
+
+                let node = scope.get_slot::<NodeRef>().unwrap().0.clone();
+                let external = External::new(scope, Rc::into_raw(node.clone()) as *mut _);
+                let weak = Weak::with_finalizer(
+                    scope,
+                    external,
+                    Box::new(move |_| unsafe {
+                        // External is already freed, so we have to decrease the count manually.
+                        let ptr = Rc::into_raw(node);
+                        Rc::decrement_strong_count(ptr);
+                        let _ = Rc::from_raw(ptr);
+                    }),
+                );
+                let value = weak.to_local(scope).unwrap();
+                this.set_private(scope, key, value.into());
                 println!("Hello");
             },
         )

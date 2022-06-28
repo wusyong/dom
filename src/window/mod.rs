@@ -20,26 +20,47 @@ pub struct Window {
 impl Window {
     const NAME: &'static str = "Window";
 
-    pub fn init<'s>(
+    pub fn constructor<'s>(
         &self,
         scope: &mut HandleScope<'s, ()>,
-        document: Local<'s, ObjectTemplate>,
-        constructor: Local<'s, FunctionTemplate>,
-    ) -> Option<Local<'s, FunctionTemplate>> {
+    ) -> Option<Local<'s, ObjectTemplate>> {
         let template = FunctionTemplate::builder(
             |_: &mut HandleScope, _: FunctionCallbackArguments, _: ReturnValue| {},
         )
         .build(scope);
 
-        template.set_class_name(String::new(scope, Self::NAME).unwrap());
+        template.set_class_name(String::new(scope, Self::NAME)?);
+        let instance_t = template.instance_template(scope);
+        Some(instance_t)
+    }
 
-        let instance = template.instance_template(scope);
-        let name = String::new(scope, "document").unwrap();
-        instance.set(name.into(), document.into());
-        let name = String::new(scope, "Document").unwrap();
-        instance.set(name.into(), constructor.into());
+    pub fn init_global<'s>(&self, scope: &mut HandleScope<'s>) -> Option<Local<'s, Function>> {
+        // Get global property which should be `window` itself
+        let global = scope.get_current_context().global(scope);
+        let document = &self.document;
+        let node = document.as_node();
 
-        Some(template)
+        // Set the root of DOM tree to a scope slot
+        scope.set_slot(node.inner.clone());
+
+        // Set `Node` function
+        // Node template can get from Document itself
+        let node_ft = node.constructor(scope)?;
+        let node_f = node_ft.get_function(scope)?;
+        let name = String::new(scope, "Node")?;
+        global.set(scope, name.into(), node_f.into());
+
+        // Set `Document` function
+        let document_ft = document.constructor(scope, node_ft)?;
+        let document_f = document_ft.get_function(scope)?;
+        let name = String::new(scope, "Document")?;
+        global.set(scope, name.into(), document_f.into());
+
+        // Set `document` instance
+        let document_i = document_f.new_instance(scope, &[])?;
+        let name = String::new(scope, "document")?;
+        global.set(scope, name.into(), document_i.into());
+        Some(document_f)
     }
 }
 
@@ -77,22 +98,18 @@ mod tests {
         ";
         let root = kuchiki::parse_html().one(html);
         let document = Document::new(root);
-        // Node template can get from Document itself
-        let node_ft = document.as_node().template(scope).unwrap();
-        let document_ft = document.template(scope, node_ft).unwrap();
-        let document_it = document_ft.instance_template(scope);
 
         // Create Window
         let window = Window::new(document);
-        let window_ft = window.init(scope, document_it, document_ft).unwrap();
-        let window_it = window_ft.instance_template(scope);
+        let templ = window.constructor(scope).unwrap();
 
         // Create Window Context
-        let context = Context::new_from_template(scope, window_it);
+        let context = Context::new_from_template(scope, templ);
         let scope = &mut ContextScope::new(scope, context);
+        window.init_global(scope);
 
         // Run Script
-        let source = v8::String::new(scope, "this.document.m").unwrap();
+        let source = v8::String::new(scope, "let x = new Document(); x.bb").unwrap();
         let script = v8::Script::compile(scope, source, None).unwrap();
         let r = script.run(scope).unwrap();
 
